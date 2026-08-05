@@ -1,0 +1,74 @@
+name: Build TWRP H100
+
+on:
+  workflow_dispatch:
+
+jobs:
+  twrp:
+    runs-on: ubuntu-22.04
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+        git gnupg flex bison build-essential zip curl \
+        zlib1g-dev gcc-multilib g++-multilib \
+        libxml2-utils xsltproc unzip \
+        python3 rsync ccache \
+        openjdk-11-jdk
+
+
+    - name: Install repo
+      run: |
+        mkdir -p ~/bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo \
+        > ~/bin/repo
+        chmod a+x ~/bin/repo
+        echo "$HOME/bin" >> $GITHUB_PATH
+
+
+    - name: Sync TWRP source
+      run: |
+        mkdir twrp
+        cd twrp
+
+        repo init \
+        -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git \
+        -b twrp-12.1
+
+        repo sync -j$(nproc) --force-sync
+
+
+    - name: Add device tree
+      run: |
+        mkdir -p twrp/device/eebbk
+
+        cp -r device/eebbk/H100 \
+        twrp/device/eebbk/H100
+
+
+    - name: Build
+      run: |
+
+        cd twrp
+
+        source build/envsetup.sh
+
+        lunch twrp_H100-eng
+
+        mka recoveryimage
+
+
+    - name: Upload recovery
+      uses: actions/upload-artifact@v4
+
+      with:
+        name: TWRP-H100
+        path: |
+          twrp/out/target/product/H100/recovery.img
